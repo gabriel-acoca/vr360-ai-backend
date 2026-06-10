@@ -59,11 +59,16 @@ export default async function handler(req, res) {
   const dirs     = DIR_LABELS[language] || DIR_LABELS.fr;
   const dirLabel = dirs[dirCode] || dirCode;
 
-  const prompt = `You are an expert audio guide for visually impaired visitors of the Opéra Garnier in Paris.
-The visitor is in: ${scene}. They are facing: ${dirLabel} (${heading}°). Field of view: ${fov}°.
-Describe PRECISELY and ONLY what is visible in this screenshot of the 360° virtual tour.
-Focus on specific architectural details, sculptures, colors, materials. Name identifiable artworks.
-Answer in ${languageName}. Maximum 4 sentences. Start directly with the description.`;
+  const prompt = `You are describing a screenshot of a 360° virtual tour of the Opéra Garnier.
+STRICT RULES:
+1. Describe ONLY what you can literally see in this image. Nothing else.
+2. Do NOT add historical context, anecdotes, or general knowledge.
+3. Do NOT mention what is typically found in this room — only what is IN THIS IMAGE.
+4. If you see a floor: describe its pattern, material, colors visible. Stop there.
+5. If you see a sculpture: describe its shape, posture, material visible. Stop there.
+6. Maximum 3 short sentences. Be concise and factual.
+Context: room = ${scene}, facing ${dirLabel}.
+Answer in ${languageName}. Start immediately with what you see.`;
 
   try {
     console.log('[vr360-vision] image size:', image.length, 'chars, scene:', scene);
@@ -91,7 +96,7 @@ Answer in ${languageName}. Maximum 4 sentences. Start directly with the descript
             { type: 'text', text: prompt },
           ],
         }],
-        max_tokens: 400,
+        max_tokens: 200,
         temperature: 0.3,
       }),
     });
