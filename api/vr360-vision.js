@@ -1,19 +1,20 @@
 // api/vr360-vision.js — backend Vercel
-// Reçoit un screenshot base64 du canvas krpano, renvoie une description via Claude vision
+// Utilise OpenRouter (comme vr360-chat.js) — pas d'appel direct à Anthropic
 
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '10mb',  // images base64 peuvent être volumineuses
+      sizeLimit: '10mb',
     },
   },
 };
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-
 const DIR_LABELS = {
   fr: { N:'nord', NE:'nord-est', E:'est', SE:'sud-est', S:'sud', SO:'sud-ouest', O:'ouest', NO:'nord-ouest' },
   en: { N:'north', NE:'northeast', E:'east', SE:'southeast', S:'south', SO:'southwest', O:'west', NO:'northwest' },
+  de: { N:'Norden', NE:'Nordosten', E:'Osten', SE:'Südosten', S:'Süden', SO:'Südwesten', O:'Westen', NO:'Nordwesten' },
+  es: { N:'norte', NE:'noreste', E:'este', SE:'sureste', S:'sur', SO:'suroeste', O:'oeste', NO:'noroeste' },
+  it: { N:'nord', NE:'nord-est', E:'est', SE:'sud-est', S:'sud', SO:'sud-ovest', O:'ovest', NO:'nord-ovest' },
 };
 
 function headingToDir(h) {
@@ -49,84 +50,70 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing or empty image data' });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+    return res.status(500).json({ error: 'OPENROUTER_API_KEY not configured' });
   }
 
   const dirCode  = headingToDir(heading);
   const dirs     = DIR_LABELS[language] || DIR_LABELS.fr;
   const dirLabel = dirs[dirCode] || dirCode;
 
-  // Réduire la qualité de l'image si elle est trop grande (>1MB base64)
-  // Le canvas renvoie parfois 2-3MB — on tronque si nécessaire pour l'API
-  const imageData = image.length > 1400000 ? image.substring(0, 1400000) : image;
-
-  const prompt = [
-    `You are an expert audio guide for visually impaired visitors of the Opéra Garnier (Palais Garnier) in Paris.`,
-    ``,
-    `The visitor is in: ${scene}.`,
-    `They are facing: ${dirLabel} (${heading}°). Field of view: ${fov}°.`,
-    ``,
-    `Describe PRECISELY and ONLY what is visible in this screenshot of the 360° virtual tour.`,
-    `Do NOT describe what is generally found in this room — describe what is actually visible IN THIS IMAGE.`,
-    `Focus on: specific architectural details, sculptures, decorative elements, colors, materials, light, depth.`,
-    `If a specific artwork or object is clearly identifiable, name it.`,
-    ``,
-    `Answer in ${languageName}. Maximum 4 sentences. Start directly with the description, no preamble.`,
-  ].join('\n');
+  const prompt = `You are an expert audio guide for visually impaired visitors of the Opéra Garnier in Paris.
+The visitor is in: ${scene}. They are facing: ${dirLabel} (${heading}°). Field of view: ${fov}°.
+Describe PRECISELY and ONLY what is visible in this screenshot of the 360° virtual tour.
+Focus on specific architectural details, sculptures, colors, materials. Name identifiable artworks.
+Answer in ${languageName}. Maximum 4 sentences. Start directly with the description.`;
 
   try {
-    console.log('[vr360-vision] Calling Anthropic, image size:', imageData.length, 'chars');
+    console.log('[vr360-vision] image size:', image.length, 'chars, scene:', scene);
 
-    const response = await fetch(ANTHROPIC_API_URL, {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://www.gabrielacoca.fr',
+        'X-Title': 'VR360 Opera Garnier Vision',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 400,
+        model: 'anthropic/claude-3-haiku',
         messages: [{
           role: 'user',
           content: [
             {
-              type: 'image',
-              source: { type: 'base64', media_type: mediaType, data: imageData },
+              type: 'image_url',
+              image_url: {
+                url: `data:${mediaType};base64,${image}`,
+                detail: 'high',
+              },
             },
-            {
-              type: 'text',
-              text: prompt,
-            },
+            { type: 'text', text: prompt },
           ],
         }],
+        max_tokens: 400,
+        temperature: 0.3,
       }),
     });
 
     const responseText = await response.text();
-    console.log('[vr360-vision] Anthropic status:', response.status, responseText.substring(0, 200));
+    console.log('[vr360-vision] OpenRouter status:', response.status, responseText.substring(0, 150));
 
     if (!response.ok) {
-      return res.status(500).json({ error: `Anthropic API error ${response.status}: ${responseText.substring(0, 100)}` });
+      return res.status(500).json({ error: `OpenRouter error ${response.status}` });
     }
 
     const data = JSON.parse(responseText);
-    const description = (data.content || [])
-      .filter(b => b.type === 'text')
-      .map(b => b.text)
-      .join(' ')
-      .trim();
+    const description = data.choices?.[0]?.message?.content?.trim();
 
     if (!description) {
-      return res.status(500).json({ error: 'Empty response from Claude' });
+      return res.status(500).json({ error: 'Empty response' });
     }
 
     return res.status(200).json({ reply: description });
 
   } catch (err) {
     console.error('[vr360-vision] Error:', err.message);
-    return res.status(500).json({ error: err.message || 'Internal error' });
+    return res.status(500).json({ error: err.message });
   }
 }
