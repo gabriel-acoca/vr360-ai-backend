@@ -1,6 +1,13 @@
 // api/vr360-vision.js — backend Vercel
 // Reçoit un screenshot base64 du canvas krpano, renvoie une description via Claude vision
-// Aucune dépendance externe — utilise fetch natif (Node 18+)
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',  // images base64 peuvent être volumineuses
+    },
+  },
+};
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
@@ -51,6 +58,10 @@ export default async function handler(req, res) {
   const dirs     = DIR_LABELS[language] || DIR_LABELS.fr;
   const dirLabel = dirs[dirCode] || dirCode;
 
+  // Réduire la qualité de l'image si elle est trop grande (>1MB base64)
+  // Le canvas renvoie parfois 2-3MB — on tronque si nécessaire pour l'API
+  const imageData = image.length > 1400000 ? image.substring(0, 1400000) : image;
+
   const prompt = [
     `You are an expert audio guide for visually impaired visitors of the Opéra Garnier (Palais Garnier) in Paris.`,
     ``,
@@ -66,6 +77,8 @@ export default async function handler(req, res) {
   ].join('\n');
 
   try {
+    console.log('[vr360-vision] Calling Anthropic, image size:', imageData.length, 'chars');
+
     const response = await fetch(ANTHROPIC_API_URL, {
       method: 'POST',
       headers: {
@@ -81,7 +94,7 @@ export default async function handler(req, res) {
           content: [
             {
               type: 'image',
-              source: { type: 'base64', media_type: mediaType, data: image },
+              source: { type: 'base64', media_type: mediaType, data: imageData },
             },
             {
               type: 'text',
@@ -92,13 +105,14 @@ export default async function handler(req, res) {
       }),
     });
 
+    const responseText = await response.text();
+    console.log('[vr360-vision] Anthropic status:', response.status, responseText.substring(0, 200));
+
     if (!response.ok) {
-      const errText = await response.text();
-      console.error('[vr360-vision] Anthropic error:', response.status, errText);
-      return res.status(500).json({ error: `Anthropic API error ${response.status}` });
+      return res.status(500).json({ error: `Anthropic API error ${response.status}: ${responseText.substring(0, 100)}` });
     }
 
-    const data = await response.json();
+    const data = JSON.parse(responseText);
     const description = (data.content || [])
       .filter(b => b.type === 'text')
       .map(b => b.text)
@@ -112,7 +126,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ reply: description });
 
   } catch (err) {
-    console.error('[vr360-vision] Error:', err);
+    console.error('[vr360-vision] Error:', err.message);
     return res.status(500).json({ error: err.message || 'Internal error' });
   }
 }
