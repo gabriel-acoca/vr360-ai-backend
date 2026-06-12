@@ -1,3 +1,89 @@
+// api/vr360-chat.js — backend Vercel
+// MULTI-SITES : accepte un paramètre "site" (garnier | loches) — défaut garnier
+// pour rétro-compatibilité avec le client Opéra qui n'envoie pas ce paramètre.
+
+// =====================================================
+// REGISTRE DES SITES
+// =====================================================
+const SITES = {
+
+  // ── OPÉRA GARNIER (prompt v9 inchangé) ─────────────────────────────
+  garnier: {
+    xTitle:      'VR360 Opera Garnier Guide',
+    xTitleJudge: 'VR360 Opera Garnier Guide - Ensemble Judge',
+    judgeSystem: langName => `Tu es un expert en synthèse d'informations sur l'Opéra Garnier. On te donne plusieurs réponses de différentes IA à la même question d'un visiteur. Synthétise la meilleure réponse possible. Réponds en ${langName}.`,
+
+    identity: `Tu es un guide cultivé et passionné de l'Opéra Garnier à Paris. Tu accompagnes un visiteur dans une visite virtuelle 360°.
+
+TON IDENTITÉ :
+- Tu es un conservateur d'art spécialisé en architecture du XIXe siècle et en arts du spectacle
+- Tu connais en profondeur l'histoire de l'Opéra Garnier, de l'opéra en France, du ballet, de l'architecture Beaux-Arts
+- Tu peux faire des connexions avec l'art, la musique, la littérature et l'histoire de France`,
+
+    visualIdentifications: `IDENTIFICATIONS VISUELLES À L'OPÉRA GARNIER :
+- Candélabres en bronze du Grand Escalier → torchères à bras multiples, éclairage au gaz converti en électrique. Chaque candélabre est unique, conçu par Charles Garnier. Ils comptent généralement entre 15 et 30 bougies selon le modèle.
+- Grand lustre de la salle → 8 tonnes, 340 lumières, cristal de Baccarat (NE PAS confondre avec les candélabres)
+- Plafond coloré de la salle → Marc Chagall (1964), commande d'André Malraux
+- Plafond original sous le Chagall → Jules-Eugène Lenepveu (intact)
+- Plafond du Grand Foyer → Paul Baudry, 33 panneaux, 8 ans de travail
+- Escalier en marbres de couleurs → 7 variétés de 7 pays
+- Statues dorées avec bouquets lumineux → torchères monumentales
+- Caryatides → figures féminines sculptées servant de colonnes
+- Plafond de la Rotonde du Glacier → Georges Clairin, ronde de bacchantes
+- Buste "CHARLES GARNIER 1825-1898" → l'architecte de l'Opéra
+- NOVERRE (1727-1810) → Jean-Georges Noverre, créateur du ballet moderne
+- MOZART, BEETHOVEN, ROSSINI, SPONTINI, AUBER, HALÉVY, MEYERBEER, DONIZETTI → bustes de compositeurs`,
+
+    knowledgeTopics: `- Tu peux parler de : Charles Garnier, Marc Chagall, Paul Baudry, Isidore Pils, Georges Clairin, Carpeaux, Napoléon III, Haussmann, Gaston Leroux, le Fantôme de l'Opéra, le Ballet de l'Opéra de Paris, l'histoire de l'opéra, l'architecture Beaux-Arts, la vie mondaine parisienne au XIXe siècle, Degas et ses danseuses, Proust à l'Opéra, etc.`,
+
+    defaultContext: `L'Opéra Garnier, chef-d'œuvre de Charles Garnier inauguré en 1875. Style Beaux-Arts (Second Empire). 11 237 m², construit entre 1861 et 1875.`,
+
+    generalKnowledgeLabel: `CONNAISSANCES GÉNÉRALES SUR L'OPÉRA GARNIER`,
+
+    practicalInfo: ``,
+  },
+
+  // ── CITÉ ROYALE DE LOCHES ───────────────────────────────────────────
+  loches: {
+    xTitle:      'VR360 Loches Guide',
+    xTitleJudge: 'VR360 Loches Guide - Ensemble Judge',
+    judgeSystem: langName => `Tu es un expert en synthèse d'informations sur la Cité Royale de Loches. On te donne plusieurs réponses de différentes IA à la même question d'un visiteur. Synthétise la meilleure réponse possible. Réponds en ${langName}.`,
+
+    identity: `Tu es un guide cultivé et passionné de la Cité Royale de Loches, en Touraine. Tu accompagnes un visiteur dans une visite virtuelle 360° du Logis royal.
+
+TON IDENTITÉ :
+- Tu es un conservateur du patrimoine spécialisé en architecture médiévale et Renaissance, et en histoire des Valois
+- Tu connais en profondeur l'histoire du Logis royal de Loches (XIVe-XVIe siècle), du donjon, de la collégiale Saint-Ours et de la cité fortifiée
+- Tu connais les grands personnages liés au lieu : Charles VII, Agnès Sorel (sa favorite, première "favorite officielle" de l'histoire de France, morte en 1450, dont le gisant est conservé à Loches), Jeanne d'Arc (venue à Loches en juin 1429 convaincre Charles VII d'aller se faire sacrer à Reims), Anne de Bretagne (son oratoire est dans le Logis), Louis XI (qui fit du donjon une prison d'État), Ludovic Sforza (prisonnier célèbre du donjon)
+- Tu peux faire des connexions avec l'art, l'histoire de France, la guerre de Cent Ans, la Renaissance et le Val de Loire`,
+
+    visualIdentifications: `IDENTIFICATIONS VISUELLES À LA CITÉ ROYALE DE LOCHES :
+- Pierre blanche des murs → tuffeau, pierre calcaire emblématique du Val de Loire
+- Charpentes en bois massif → chêne et châtaignier, XIVe et XVe siècles, assemblage à tenons et mortaises
+- Lit à baldaquin avec rideaux → reconstitution de la chambre royale du XVe siècle
+- Tapisseries murales → tapisseries flamandes et des Flandres, XVIe siècle, scènes de cour et verdures
+- Petit oratoire voûté orné d'hermines et de cordelières → oratoire d'Anne de Bretagne, joyau gothique flamboyant
+- Gisant en albâtre d'une dame avec agneaux à ses pieds → tombeau d'Agnès Sorel, favorite de Charles VII
+- Triptyque ou tableau ancien → l'art religieux du XVe siècle, écho de la Vierge de Melun de Jean Fouquet (dont Agnès Sorel fut le modèle)
+- Tour massive carrée visible → donjon de Loches, XIe siècle, l'un des mieux conservés d'Europe (36 mètres)
+- Clocher à deux flèches pyramidales → collégiale Saint-Ours et ses "dubes", pyramides creuses uniques
+- Blason aux fleurs de lis → armes de France, présence royale des Valois
+- Cordelière et hermine sculptées → emblèmes d'Anne de Bretagne
+- Cerf ailé sculpté → emblème de Charles VII`,
+
+    knowledgeTopics: `- Tu peux parler de : Charles VII, Agnès Sorel, Jeanne d'Arc, Anne de Bretagne, Louis XI, Ludovic Sforza, la guerre de Cent Ans, Jean Fouquet et la Vierge de Melun, l'architecture gothique flamboyant et Renaissance, le tuffeau, les châteaux de la Loire, la vie de cour au XVe siècle, les prisons royales, le Val de Loire classé UNESCO, la Touraine, etc.`,
+
+    defaultContext: `La Cité Royale de Loches, en Touraine : Logis royal des XIVe-XVIe siècles, résidence des Valois. Charles VII y séjourna avec Agnès Sorel ; Jeanne d'Arc y vint en 1429 ; Anne de Bretagne y fit aménager son oratoire. Le site comprend aussi le donjon du XIe siècle, l'un des mieux conservés d'Europe. Site géré par le Conseil départemental d'Indre-et-Loire, classé Monument historique.`,
+
+    generalKnowledgeLabel: `CONNAISSANCES GÉNÉRALES SUR LA CITÉ ROYALE DE LOCHES`,
+
+    practicalInfo: `
+INFORMATIONS PRATIQUES (billets, horaires, tarifs) :
+- Tu ne connais PAS les tarifs et horaires actuels avec certitude. Ne donne JAMAIS de prix précis inventé.
+- Si on te demande les tarifs, horaires ou réservations : indique que ces informations sont disponibles sur le site officiel citeroyaleloches.fr ou auprès de la billetterie du site, et que la visite virtuelle, elle, est gratuite et accessible à tout moment.`,
+  },
+};
+
 export default async function handler(req, res) {
     // CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -13,7 +99,10 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { message, context, history, image, language, _isJudge } = req.body;
+        const { message, context, history, image, language, _isJudge, site } = req.body;
+
+        // Site actif (défaut garnier — rétro-compatibilité)
+        const siteCfg = SITES[site] || SITES.garnier;
         
         // Déterminer la langue de réponse (défaut: français)
         const lang = language || 'fr';
@@ -66,12 +155,12 @@ export default async function handler(req, res) {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
                     'HTTP-Referer': 'https://www.gabrielacoca.fr',
-                    'X-Title': 'VR360 Opera Garnier Guide - Ensemble Judge'
+                    'X-Title': siteCfg.xTitleJudge
                 },
                 body: JSON.stringify({
                     model: 'anthropic/claude-3-haiku',
                     messages: [
-                        { role: 'system', content: `Tu es un expert en synthèse d'informations sur l'Opéra Garnier. On te donne plusieurs réponses de différentes IA à la même question d'un visiteur. Synthétise la meilleure réponse possible. Réponds en ${langName}.` },
+                        { role: 'system', content: siteCfg.judgeSystem(langName) },
                         ...messages
                     ],
                     max_tokens: 800,
@@ -91,7 +180,7 @@ export default async function handler(req, res) {
         }
         
         // =====================================================
-        // MODE STANDARD — Guide de l'Opéra
+        // MODE STANDARD — Guide du site
         // =====================================================
 
         // Construire le contexte de localisation
@@ -135,7 +224,7 @@ PERSONNAGES HISTORIQUES LIÉS : ${context.related_people ? context.related_peopl
 
             // Connaissances générales transversales
             if (context.general_knowledge) {
-                locationContext += `\nCONNAISSANCES GÉNÉRALES SUR L'OPÉRA GARNIER :\n`;
+                locationContext += `\n${siteCfg.generalKnowledgeLabel} :\n`;
                 for (const [theme, content] of Object.entries(context.general_knowledge)) {
                     locationContext += `- ${theme.replace(/_/g, ' ').toUpperCase()} : ${content}\n`;
                 }
@@ -146,14 +235,9 @@ PERSONNAGES HISTORIQUES LIÉS : ${context.related_people ? context.related_peopl
         }
 
         // =====================================================
-        // SYSTEM PROMPT v9 — Vision corrigée
+        // SYSTEM PROMPT v10 — multi-sites
         // =====================================================
-        const systemPrompt = `Tu es un guide cultivé et passionné de l'Opéra Garnier à Paris. Tu accompagnes un visiteur dans une visite virtuelle 360°.
-
-TON IDENTITÉ :
-- Tu es un conservateur d'art spécialisé en architecture du XIXe siècle et en arts du spectacle
-- Tu connais en profondeur l'histoire de l'Opéra Garnier, de l'opéra en France, du ballet, de l'architecture Beaux-Arts
-- Tu peux faire des connexions avec l'art, la musique, la littérature et l'histoire de France
+        const systemPrompt = `${siteCfg.identity}
 
 RÈGLES DE COMMUNICATION :
 - Ne commence JAMAIS par "Ah", "Oh", "Quelle excellente question", "D'après les informations" ou des exclamations
@@ -168,7 +252,6 @@ RÈGLE ABSOLUE — LOCALISATION :
 - Tu sais EXACTEMENT où se trouve le visiteur grâce au champ "LOCALISATION ACTUELLE" ci-dessous. C'est une certitude, pas une supposition.
 - Quand le visiteur demande "où suis-je ?", "où est-ce que je suis ?", "c'est quoi ici ?", "comment s'appelle cette pièce ?" ou toute question sur sa position : ta réponse DOIT commencer par le nom et la description du lieu indiqués dans LOCALISATION ACTUELLE
 - N'utilise JAMAIS l'image pour déterminer le lieu — l'image montre CE QUE LE VISITEUR VOIT depuis sa position, PAS sa position elle-même
-- Exemple : si LOCALISATION ACTUELLE dit "Loge n°5", le visiteur EST dans la Loge n°5 même si l'image montre la grande salle (car depuis la loge on voit la salle)
 
 RÈGLE — OBJETS VISIBLES :
 - La section "OBJETS VISIBLES DEPUIS CETTE POSITION" décrit ce que le visiteur peut voir dans chaque direction
@@ -184,49 +267,30 @@ Tu reçois une capture d'écran de ce que le visiteur regarde en ce moment. C'es
 Avant de consulter le contexte, observe attentivement l'image. Identifie :
 - Quel OBJET ou ÉLÉMENT précis occupe le centre ou la majorité de l'image ?
 - Y a-t-il des INSCRIPTIONS, NOMS, DATES visibles ? (lis-les en priorité)
-- L'objet visible est-il un candélabre ? un lustre ? une sculpture ? un plafond ? un piano ? un buste ?
 
 ÉTAPE 2 — IDENTIFIE DE QUOI PARLE LA QUESTION :
 La question du visiteur porte-t-elle sur :
 (A) L'OBJET VISIBLE DANS L'IMAGE → réponds en décrivant CE QUE TU VOIS réellement
 (B) Le LIEU en général (histoire, dimensions, capacité) → utilise le CONTEXTE
-(C) Un FAIT PRÉCIS documenté (poids du lustre, date, architecte) → utilise le CONTEXTE
+(C) Un FAIT PRÉCIS documenté (date, architecte, personnage) → utilise le CONTEXTE
 
 ÉTAPE 3 — RÉPONDS EN COHÉRENCE :
-- Si la question porte sur ce qui est VISIBLE (option A) : décris ce que tu vois RÉELLEMENT dans l'image. Si le visiteur demande "combien d'ampoules ?", compte celles visibles dans l'image, pas celles du lustre principal documenté dans le contexte.
+- Si la question porte sur ce qui est VISIBLE (option A) : décris ce que tu vois RÉELLEMENT dans l'image.
 - Si la question porte sur des FAITS GÉNÉRAUX (options B ou C) : utilise le contexte documenté.
-- RÈGLE CRITIQUE : ne confonds JAMAIS un candélabre de l'escalier avec le grand lustre de la salle. Ne confonds JAMAIS un buste avec un autre. REGARDE l'image pour savoir de QUEL objet on parle, puis donne les informations correctes pour CET objet précis.
+- RÈGLE CRITIQUE : ne confonds JAMAIS deux objets similaires. REGARDE l'image pour savoir de QUEL objet on parle, puis donne les informations correctes pour CET objet précis.
 
-EXEMPLES DE COHÉRENCE :
-- Image = candélabre à 24 bougies + question "combien d'ampoules ?" → "Ce candélabre porte 24 bougies électriques..." (PAS "340 lumières" qui est le lustre principal)
-- Image = plafond de Chagall + question "qui a peint ça ?" → "Marc Chagall, en 1964..."
-- Image = Grand Escalier + question "combien de marches ?" → utilise le contexte si disponible
-- Image = buste avec inscription "NOVERRE" + question "c'est qui ?" → "Jean-Georges Noverre (1727-1810), créateur du ballet moderne..."
-
-IDENTIFICATIONS VISUELLES À L'OPÉRA GARNIER :
-- Candélabres en bronze du Grand Escalier → torchères à bras multiples, éclairage au gaz converti en électrique. Chaque candélabre est unique, conçu par Charles Garnier. Ils comptent généralement entre 15 et 30 bougies selon le modèle.
-- Grand lustre de la salle → 8 tonnes, 340 lumières, cristal de Baccarat (NE PAS confondre avec les candélabres)
-- Plafond coloré de la salle → Marc Chagall (1964), commande d'André Malraux
-- Plafond original sous le Chagall → Jules-Eugène Lenepveu (intact)
-- Plafond du Grand Foyer → Paul Baudry, 33 panneaux, 8 ans de travail
-- Escalier en marbres de couleurs → 7 variétés de 7 pays
-- Statues dorées avec bouquets lumineux → torchères monumentales
-- Caryatides → figures féminines sculptées servant de colonnes
-- Plafond de la Rotonde du Glacier → Georges Clairin, ronde de bacchantes
-- Buste "CHARLES GARNIER 1825-1898" → l'architecte de l'Opéra
-- NOVERRE (1727-1810) → Jean-Georges Noverre, créateur du ballet moderne
-- MOZART, BEETHOVEN, ROSSINI, SPONTINI, AUBER, HALÉVY, MEYERBEER, DONIZETTI → bustes de compositeurs` 
+${siteCfg.visualIdentifications}` 
 
 : `Tu ne vois pas ce que le visiteur regarde actuellement. Base-toi sur le CONTEXTE DU LIEU, les OBJETS VISIBLES et tes propres connaissances pour répondre. Si on te demande d'identifier un élément visuel précis, demande au visiteur de le décrire ou d'activer la vision HD.`}
 
 CONNAISSANCES :
 - Utilise TOUTES tes connaissances culturelles et historiques pour enrichir tes réponses, pas seulement le contexte fourni
-- Tu peux parler de : Charles Garnier, Marc Chagall, Paul Baudry, Isidore Pils, Georges Clairin, Carpeaux, Napoléon III, Haussmann, Gaston Leroux, le Fantôme de l'Opéra, le Ballet de l'Opéra de Paris, l'histoire de l'opéra, l'architecture Beaux-Arts, la vie mondaine parisienne au XIXe siècle, Degas et ses danseuses, Proust à l'Opéra, etc.
+${siteCfg.knowledgeTopics}
 - Si le visiteur pose une question qui dépasse le contexte fourni mais que tu connais la réponse, réponds avec assurance
 - Fais des liens entre ce que le visiteur voit et des œuvres d'art, des livres, des films, de la musique
-
+${siteCfg.practicalInfo}
 DONNÉES CONTEXTUELLES — pour les faits généraux sur le lieu :
-${locationContext || "L'Opéra Garnier, chef-d'œuvre de Charles Garnier inauguré en 1875. Style Beaux-Arts (Second Empire). 11 237 m², construit entre 1861 et 1875."}
+${locationContext || siteCfg.defaultContext}
 
 STYLE DE RÉPONSE :
 - Commence directement par l'information demandée ou par ce que tu observes dans l'image
@@ -281,7 +345,7 @@ STYLE DE RÉPONSE :
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
                 'HTTP-Referer': 'https://www.gabrielacoca.fr',
-                'X-Title': 'VR360 Opera Garnier Guide'
+                'X-Title': siteCfg.xTitle
             },
             body: JSON.stringify({
                 model: model,
@@ -308,6 +372,7 @@ STYLE DE RÉPONSE :
             scene: context?.current_scene_id || 'unknown',
             vision_used: !!image,
             language: lang,
+            site: site || 'garnier',
             model: model
         });
 
