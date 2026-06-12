@@ -1,11 +1,27 @@
 // api/vr360-vision.js — backend Vercel
 // Utilise OpenRouter (comme vr360-chat.js) — pas d'appel direct à Anthropic
+// MULTI-SITES : accepte un paramètre "site" (garnier | loches) — défaut garnier
+// pour rétro-compatibilité avec le client Opéra qui n'envoie pas ce paramètre.
 
 export const config = {
   api: {
     bodyParser: {
       sizeLimit: '10mb',
     },
+  },
+};
+
+// ── Registre des sites ────────────────────────────────────────────────
+const SITES = {
+  garnier: {
+    tourName:    'the Opéra Garnier (Palais Garnier, Paris)',
+    defaultScene:'Opéra Garnier',
+    xTitle:      'VR360 Opera Garnier Vision',
+  },
+  loches: {
+    tourName:    'the Cité Royale de Loches (royal medieval residence, Loire Valley, France)',
+    defaultScene:'Cité Royale de Loches',
+    xTitle:      'VR360 Loches Vision',
   },
 };
 
@@ -39,12 +55,16 @@ export default async function handler(req, res) {
   const {
     image,
     mediaType = 'image/jpeg',
-    scene = 'Opéra Garnier',
+    site = 'garnier',                 // ← NOUVEAU : identifiant du site
+    scene,                            // si absent, defaultScene du site
     heading = 0,
     fov = 90,
     language = 'fr',
     languageName = 'French',
   } = req.body || {};
+
+  const siteCfg = SITES[site] || SITES.garnier;
+  const sceneLabel = scene || siteCfg.defaultScene;
 
   if (!image || image.length < 100) {
     return res.status(400).json({ error: 'Missing or empty image data' });
@@ -59,7 +79,7 @@ export default async function handler(req, res) {
   const dirs     = DIR_LABELS[language] || DIR_LABELS.fr;
   const dirLabel = dirs[dirCode] || dirCode;
 
-  const prompt = `You are describing a screenshot of a 360° virtual tour of the Opéra Garnier.
+  const prompt = `You are describing a screenshot of a 360° virtual tour of ${siteCfg.tourName}.
 STRICT RULES:
 1. Describe ONLY what you can literally see in this image. Nothing else.
 2. Do NOT add historical context, anecdotes, or general knowledge.
@@ -67,11 +87,11 @@ STRICT RULES:
 4. If you see a floor: describe its pattern, material, colors visible. Stop there.
 5. If you see a sculpture: describe its shape, posture, material visible. Stop there.
 6. Maximum 3 short sentences. Be concise and factual.
-Context: room = ${scene}, facing ${dirLabel}.
+Context: room = ${sceneLabel}, facing ${dirLabel}.
 Answer in ${languageName}. Start immediately with what you see.`;
 
   try {
-    console.log('[vr360-vision] image size:', image.length, 'chars, scene:', scene);
+    console.log('[vr360-vision] site:', site, '| image size:', image.length, 'chars, scene:', sceneLabel);
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -79,7 +99,7 @@ Answer in ${languageName}. Start immediately with what you see.`;
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
         'HTTP-Referer': 'https://www.gabrielacoca.fr',
-        'X-Title': 'VR360 Opera Garnier Vision',
+        'X-Title': siteCfg.xTitle,
       },
       body: JSON.stringify({
         model: 'anthropic/claude-3-haiku',
