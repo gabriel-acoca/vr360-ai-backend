@@ -78,9 +78,19 @@ TON IDENTITÉ :
     generalKnowledgeLabel: `CONNAISSANCES GÉNÉRALES SUR LA CITÉ ROYALE DE LOCHES`,
 
     practicalInfo: `
-INFORMATIONS PRATIQUES (billets, horaires, tarifs) :
-- Tu ne connais PAS les tarifs et horaires actuels avec certitude. Ne donne JAMAIS de prix précis inventé.
-- Si on te demande les tarifs, horaires ou réservations : indique que ces informations sont disponibles sur le site officiel citeroyaleloches.fr ou auprès de la billetterie du site, et que la visite virtuelle, elle, est gratuite et accessible à tout moment.`,
+INFORMATIONS PRATIQUES — DONNÉES VÉRIFIÉES 2026 :
+Adresse : Logis royal, 5 place Charles VII — Donjon, 7 mail du Donjon — 37600 Loches
+Téléphone : 02 47 19 18 08
+Site officiel : citeroyaleloches.fr
+Email réservations groupes : [email protected]
+Ouvert tous les jours sauf 1er janvier et 25 décembre. Dernier billet vendu 30 min avant fermeture.
+Horaires 2026 :
+- Janvier, février, novembre, décembre : 10h00–17h00
+- Mars, avril, mai, juin, septembre, octobre : 9h30–18h00
+- Juillet, août : 9h30–19h00
+Tarifs indicatifs (susceptibles d'évoluer) : plein tarif environ 11,50 € (Billet Vert à vélo), tarif réduit environ 7,50 €. Réservation obligatoire pour les groupes (15 personnes+) et visites guidées.
+La visite virtuelle accessible est gratuite et disponible à tout moment sur vr360.productions.
+Si les tarifs ou horaires ont changé, invite le visiteur à vérifier sur citeroyaleloches.fr ou à appeler le 02 47 19 18 08.`,
   },
 };
 
